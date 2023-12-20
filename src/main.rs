@@ -274,12 +274,20 @@ fn main() -> ! {
     let mut tx_transfer = double_buffer::Config::new((ch0, ch1), tx_buf1, tx)
         .start()
         .read_next(tx_buf2);
+    // Here I create a third buffer, because I believe I need three in order to support
+    // double-buffer ping/pong using read_next below.
     let mut next_buf = singleton!(: [u32; TABLE_SIZE] = message1).unwrap();
     loop {
         if tx_transfer.is_done() {
+            // Here we generate new brown noise while the last DMA (triggered by read_next below)
+            // is still doing its thing.
             prior_sample = generate_brown_noise(&mut small_rng, gen_num, prior_sample, next_buf);
             gen_num += 1;
+            // wait is a blocking call, returns when tx_transfer is complete
             let (tx_buf, next_tx_transfer) = tx_transfer.wait();
+            // read_next is IMO confusing named - but from our point of view it's toggling
+            // what DMA channel is used and specifying next_buf for the new transfer,
+            // finally it begins the new DMA channel that uses next_buf.
             tx_transfer = next_tx_transfer.read_next(next_buf);
             next_buf = tx_buf;
         }
