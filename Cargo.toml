@@ -6,9 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+rand = { version = "0.8.3", features = ["small_rng"], default-features = false }
 cortex-m = "0.7.2"
 embedded-hal = { version = "0.2.5", features = ["unproven"] }
 cortex-m-rt = "0.7.3"
 panic-halt = "0.2.0"
-#rp-hal = "0.0.2"
+rp-hal = "0.0.2"
 rp-pico = "0.8.0"
+fixed = "1.24.0"
+rp2040-hal = "0.9.1"
+rp2040-boot2 = "0.3.0"
+pio-proc = "0.2.2"
+pio = "0.2.1"
