@@ -11,7 +11,6 @@ cortex-m = "0.7.2"
 embedded-hal = { version = "0.2.5", features = ["unproven"] }
 cortex-m-rt = "0.7.3"
 panic-halt = "0.2.0"
-rp-hal = "0.0.2"
 rp-pico = "0.8.0"
 fixed = "1.24.0"
 rp2040-hal = "0.9.1"

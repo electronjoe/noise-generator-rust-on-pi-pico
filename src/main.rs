@@ -3,16 +3,16 @@
 
 use cortex_m::singleton;
 use fixed::types::I16F16;
-use rp2040_hal as hal;
-use hal::pio::ShiftDirection;
 use hal::dma::{double_buffer, single_buffer, DMAExt};
 use hal::gpio::{FunctionPio0, Pin};
 use hal::pac;
 use hal::pio::PIOExt;
+use hal::pio::ShiftDirection;
 use hal::Sio;
 use panic_halt as _;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
+use rp2040_hal as hal;
 
 /// The linker will place this boot block at the start of our program image. We
 /// need this to help the ROM bootloader get our code up and running.
@@ -104,7 +104,7 @@ fn generate_brown_noise(
 
         let maybe_new_sample = LEAKAGE * prior_sample + white * SCALING;
 
-        // Brown noise random walk can overflow, so here we invert the random walk if we would otherwise 
+        // Brown noise random walk can overflow, so here we invert the random walk if we would otherwise
         // overflow [-0.25, 0.25].
         let new_sample = if maybe_new_sample >= 0.25 || maybe_new_sample <= -0.25 {
             LEAKAGE * prior_sample - white * SCALING
