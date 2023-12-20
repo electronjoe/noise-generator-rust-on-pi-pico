@@ -1,25 +1,17 @@
-## Depenency Features
+# Brown Noise Generator for Pimroni Pico Audio on Pi Pico in Rust
+
+## Acknowledgements
+
+- A great deal of the Rust functional bootstrapping for this project is thanks to [ramenspazz](https://github.com/ramenspazz)'s [Pico_I2S](https://github.com/ramenspazz/Pico_I2S) project for this same hardware set (Pimroni Pico Audio shield on the Pi Pico) - in Rust.
+- This project uses the pio I2S assembly provided by [raspberrypi/pico-extras](https://raw.githubusercontent.com/raspberrypi/pico-extras/master/src/rp2_common/pico_audio_i2s/audio_i2s.pio).
+
+## Building and Flashing
+
+You'll need to install Rust Embedded toolchains, see the Rust Embedded book for details there.
 
 ```
-electronjoe@pop-os:~/Documents/noise-generator-rust-on-pi-pico$ cargo add rp-pico
-    Updating crates.io index
-      Adding rp-pico v0.8.0 to dependencies.
-             Features:
-             + boot2
-             + cortex-m-rt
-             + critical-section-impl
-             + rom-func-cache
-             + rp2040-boot2
-             + rt
-             - disable-intrinsics
-             - rom-v2-intrinsics
-             - rp2040-e5
-    Updating crates.io index
-electronjoe@pop-os:~/Documents/noise-generator-rust-on-pi-pico$ cargo add cortex-m-rt
-    Updating crates.io index
-      Adding cortex-m-rt v0.7.3 to dependencies.
-             Features:
-             - device
-             - set-sp
-             - set-vtor
+cargo run --release
 ```
+
+Will flash a Pi Pico that is in USB boot mode.
+
