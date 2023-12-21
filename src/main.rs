@@ -8,8 +8,9 @@ use hal::gpio::{FunctionPio0, Pin};
 use hal::pac;
 use hal::pio::PIOExt;
 use hal::pio::ShiftDirection;
+use hal::pwm::A;
 use hal::Sio;
-use noise_generator::{gen_white_noise, Butterworth};
+use noise_generator::{gen_white_noise, Butterworth, ButterworthParams};
 use panic_halt as _;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -63,38 +64,25 @@ enum SampleFrequency {
     Freq384khz,
 }
 
-// Generates a sawtooth wave at 2 khz in a buffer containing 220 samples.
-// Amplitude will be from -2^14 to 2^14
-fn generate_sawtooth_wave(samples: &mut [u32]) {
-    for i in 0..TABLE_SIZE {
-        // for now ignore channel associated with high 16 bits
-        let amplitude = if i < 110 {
-            -1.0 + (i as f32) * (2.0 / 110.0)
-        } else {
-            1.0 - (i as f32 - 110.0) * (2.0 / 110.0)
-        };
-        let val: i16 = (amplitude * 16384.0) as i16;
-        samples[i] = val as u16 as u32;
-    }
-}
-
 // Generates fan noise in the low 16 bits (mono) of each buffer sample.
 // We use I16F16 to represent samples to ease the converstions from the RNG.
-fn generate_brown_noise(
+fn generate_samples(
     rng: &mut SmallRng,
-    butterworth: &mut Butterworth,
+    butterworth_band_132hz: &mut Butterworth,
+    butterworth_low_100hz: &mut Butterworth,
     gen_num: usize,
     samples: &mut [u32],
 ) {
     const VOLUME: I16F16 = I16F16::lit("0.25");
     for sample in samples.iter_mut() {
         // Generate a white noise sample value in range [-1.0, 1.0] in I16F16
-        let white: I16F16 = gen_white_noise(rng) * VOLUME;
+        let white: I16F16 = gen_white_noise(rng);
 
         // Filter the white noise.
-        let filtered = butterworth.compute(white);
+        let band_132hz = butterworth_band_132hz.compute(white) * I16F16::from_num(0.6);
+        let low_100hz = butterworth_low_100hz.compute(white) * I16F16::from_num(0.4);
         // Scale the I16F16 so that it's integral part can be used in an i16
-        let scaled_sample = filtered * I16F16::MAX;
+        let scaled_sample = ((band_132hz + low_100hz) * VOLUME) * I16F16::MAX;
         *sample = (scaled_sample.to_num::<i16>()) as u32 & 0xFFFF;
     }
 }
@@ -239,22 +227,51 @@ fn main() -> ! {
     let mut small_rng = SmallRng::seed_from_u64(0xfeedbeeffeedbeef_u64);
     let mut gen_num: usize = 0;
 
+    let params_band_132hz: ButterworthParams = ButterworthParams {
+        a: [
+            I16F16::from_num(1), // Unused, but as intended
+            I16F16::from_num(-1.99130017),
+            I16F16::from_num(0.99171384),
+        ],
+        b: [
+            I16F16::from_num(0.00414308),
+            I16F16::from_num(0),
+            I16F16::from_num(-0.00414308),
+        ],
+    };
+    let mut butterworth_band_132hz = Butterworth::new(params_band_132hz);
+ 
     // Filter coefficients
-    let b = [
-        I16F16::from_num(0.00414308),
-        I16F16::from_num(0),
-        I16F16::from_num(-0.00414308),
-    ];
-    let a = [
-        I16F16::from_num(1), // Unused, but as intended
-        I16F16::from_num(-1.99130017),
-        I16F16::from_num(0.99171384),
-    ];
-    let mut butterworth = Butterworth::new(a, b);
+    let params_low_100hz: ButterworthParams = ButterworthParams {
+        a: [
+            I16F16::from_num(1), // Unused, but as intended
+            I16F16::from_num(-1.97985154),
+            I16F16::from_num(0.98005251),
+        ],
+        b: [
+            I16F16::from_num(5.02414230e-05),
+            I16F16::from_num(1.00482846e-04),
+            I16F16::from_num(5.02414230e-05),
+        ],
+    };
+    let mut butterworth_low_100hz = Butterworth::new(params_low_100hz);
 
-    generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, tx_buf1);
+
+    generate_samples(
+        &mut small_rng,
+        &mut butterworth_band_132hz,
+        &mut butterworth_low_100hz,
+        gen_num,
+        tx_buf1,
+    );
     gen_num += 1;
-    generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, tx_buf2);
+    generate_samples(
+        &mut small_rng,
+        &mut butterworth_band_132hz,
+        &mut butterworth_low_100hz,
+        gen_num,
+        tx_buf2,
+    );
     gen_num += 1;
     let tx_transfer1 = single_buffer::Config::new(dma.ch0, tx_buf1, tx).start();
     let (ch0, tx_buf1, tx) = tx_transfer1.wait();
@@ -272,7 +289,13 @@ fn main() -> ! {
         if tx_transfer.is_done() {
             // Here we generate new brown noise while the last DMA (triggered by read_next below)
             // is still doing its thing.
-            generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, next_buf);
+            generate_samples(
+                &mut small_rng,
+                &mut butterworth_band_132hz,
+                &mut butterworth_low_100hz,
+                gen_num,
+                next_buf,
+            );
             gen_num += 1;
             // wait is a blocking call, returns when tx_transfer is complete
             let (tx_buf, next_tx_transfer) = tx_transfer.wait();

@@ -3,9 +3,13 @@ use fixed::types::I16F16;
 use rand::rngs::SmallRng;
 use rand::Rng;
 
+pub struct ButterworthParams {
+    pub a: [I16F16; 3],
+    pub b: [I16F16; 3],
+}
+
 pub struct Butterworth {
-    a: [I16F16; 3],
-    b: [I16F16; 3],
+    params: ButterworthParams,
     inputs: [I16F16; 3],
     outputs: [I16F16; 2],
     input_index: usize,
@@ -13,10 +17,9 @@ pub struct Butterworth {
 }
 
 impl Butterworth {
-    pub fn new(a_params: [I16F16; 3], b_params: [I16F16; 3]) -> Self {
+    pub fn new(params: ButterworthParams) -> Self {
         Self {
-            a: a_params,
-            b: b_params,
+            params: params,
             inputs: [I16F16::from_num(0); 3],
             outputs: [I16F16::from_num(0); 2],
             input_index: 0,
@@ -40,11 +43,11 @@ impl Butterworth {
 
         // Compute the output using the filter difference equation
         // y[n] = b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] - a1 * y[n-1] - a2 * y[n-2]
-        let y = self.b[0] * self.inputs[self.input_index]
-            + self.b[1] * self.inputs[(self.input_index + 2) % 3]
-            + self.b[2] * self.inputs[(self.input_index + 1) % 3]
-            - self.a[1] * self.outputs[(self.output_index + 1) % 2]
-            - self.a[2] * self.outputs[self.output_index];
+        let y = self.params.b[0] * self.inputs[self.input_index]
+            + self.params.b[1] * self.inputs[(self.input_index + 2) % 3]
+            + self.params.b[2] * self.inputs[(self.input_index + 1) % 3]
+            - self.params.a[1] * self.outputs[(self.output_index + 1) % 2]
+            - self.params.a[2] * self.outputs[self.output_index];
 
         // Push the output to the buffer and return it
         self.push_output(y);
