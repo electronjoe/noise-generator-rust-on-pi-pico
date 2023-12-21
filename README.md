@@ -30,3 +30,11 @@ Butterworth Filter Coefficients for DSP Implementation:
 
 y[n]=b[0]×x[n]+b[1]×x[n−1]+⋯+a[1]×y[n−1]+…
 - where x[n] is your input signal, and y[n] is your filtered output signal.
+
+## Host Testing
+
+I've authored a test binary to generate WAV file outputs for debug iteration in the host environment.
+
+```
+cargo test --test main --target x86_64-unknown-linux-gnu
+```

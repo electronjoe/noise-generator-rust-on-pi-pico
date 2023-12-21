@@ -9,6 +9,7 @@ use hal::pac;
 use hal::pio::PIOExt;
 use hal::pio::ShiftDirection;
 use hal::Sio;
+use noise_generator::{gen_white_noise, Butterworth};
 use panic_halt as _;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -77,48 +78,25 @@ fn generate_sawtooth_wave(samples: &mut [u32]) {
     }
 }
 
-// Generates brown noise in the low 16 bits (mono) of each buffer sample.
-// Depends upon the last sample of the prior buuffer for smoothing.
-// https://github.com/audacity/audacity/blob/236b188d6bba08ff902a7095c0425fd4a7e743de/src/effects/Noise.cpp#L141
+// Generates fan noise in the low 16 bits (mono) of each buffer sample.
 // We use I16F16 to represent samples to ease the converstions from the RNG.
-#[must_use]
 fn generate_brown_noise(
     rng: &mut SmallRng,
+    butterworth: &mut Butterworth,
     gen_num: usize,
-    prior_sample: I16F16,
     samples: &mut [u32],
-) -> I16F16 {
-    const LEAKAGE: I16F16 = I16F16::lit("0.997");
-    const SCALING: I16F16 = I16F16::lit("0.01");
+) {
     const VOLUME: I16F16 = I16F16::lit("0.25");
-    let mut prior_sample = prior_sample;
     for sample in samples.iter_mut() {
         // Generate a white noise sample value in range [-1.0, 1.0] in I16F16
-        let rv = rng.gen::<u32>();
-        // If the high bit is one, represent as a negative value.
-        let white: I16F16 = if rv & 0x8000_0000 == 0 {
-            I16F16::from_bits((rv & 0x0000_FFFF) as i32)
-        } else {
-            I16F16::from_bits((rv & 0x0000_FFFF) as i32) * -1
-        };
+        let white: I16F16 = gen_white_noise(rng) * VOLUME;
 
-        let maybe_new_sample = LEAKAGE * prior_sample + white * SCALING;
-
-        // Brown noise random walk can overflow, so here we invert the random walk if we would otherwise
-        // overflow [-0.25, 0.25].
-        let new_sample = if maybe_new_sample >= 0.25 || maybe_new_sample <= -0.25 {
-            LEAKAGE * prior_sample - white * SCALING
-        } else {
-            maybe_new_sample
-        };
-        let new_sample = new_sample * VOLUME;
-
+        // Filter the white noise.
+        let filtered = butterworth.compute(white);
         // Scale the I16F16 so that it's integral part can be used in an i16
-        let scaled_sample = new_sample * I16F16::MAX;
+        let scaled_sample = filtered * I16F16::MAX;
         *sample = (scaled_sample.to_num::<i16>()) as u32 & 0xFFFF;
-        prior_sample = new_sample;
     }
-    return prior_sample;
 }
 
 // Entry point to our bare-metal application.
@@ -259,11 +237,11 @@ fn main() -> ! {
     let tx_buf1 = singleton!(: [u32; TABLE_SIZE] = message1).unwrap();
     let tx_buf2 = singleton!(: [u32; TABLE_SIZE] = message2).unwrap();
     let mut small_rng = SmallRng::seed_from_u64(0xfeedbeeffeedbeef_u64);
-    let mut prior_sample = I16F16::lit("0.0");
     let mut gen_num: usize = 0;
-    prior_sample = generate_brown_noise(&mut small_rng, gen_num, prior_sample, tx_buf1);
+    let mut butterworth = Butterworth::new();
+    generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, tx_buf1);
     gen_num += 1;
-    prior_sample = generate_brown_noise(&mut small_rng, gen_num, prior_sample, tx_buf2);
+    generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, tx_buf2);
     gen_num += 1;
     let tx_transfer1 = single_buffer::Config::new(dma.ch0, tx_buf1, tx).start();
     let (ch0, tx_buf1, tx) = tx_transfer1.wait();
@@ -281,7 +259,7 @@ fn main() -> ! {
         if tx_transfer.is_done() {
             // Here we generate new brown noise while the last DMA (triggered by read_next below)
             // is still doing its thing.
-            prior_sample = generate_brown_noise(&mut small_rng, gen_num, prior_sample, next_buf);
+            generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, next_buf);
             gen_num += 1;
             // wait is a blocking call, returns when tx_transfer is complete
             let (tx_buf, next_tx_transfer) = tx_transfer.wait();
