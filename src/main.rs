@@ -208,7 +208,7 @@ fn main() -> ! {
 
     // clock divisor: 1/div (instructions/tick)
     // effective clock rate of PIO: 125M ticks / second * (1/div) instructions / tick => CLOCK_EFF := 125E06/div (1/seconds)
-    let CK_PIO_CYCLES_PER = 4.0f32;
+    let CK_PIO_CYCLES_PER = 2.0f32;
     let bck_data_div = (BASE_CLOCK / CK_PIO_CYCLES_PER) / bck_freq;
 
     // the clock divisor requires a whole and fractional divisor, so we calculate them here
