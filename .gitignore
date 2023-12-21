@@ -3,6 +3,7 @@
 .gdb_history
 Cargo.lock
 target/
+filter_design/plot.png
 
 # editor files
 .vscode/*

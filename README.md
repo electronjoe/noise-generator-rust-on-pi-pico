@@ -16,3 +16,17 @@ cargo run --release
 
 Will flash a Pi Pico that is in USB boot mode.
 
+## Filter Design
+
+Butterworth first order filter
+
+- center_frequency = 146 # Center frequency in Hz
+- sample_rate = 44100    # Sample rate in Hz
+- bandwidth = 0.2        # Bandwidth as a percentage
+
+Butterworth Filter Coefficients for DSP Implementation:
+- Numerator (b):  [ 0.00414308  0.         -0.00414308]
+- Denominator (a):  [ 1.         -1.99130017  0.99171384]
+
+y[n]=b[0]×x[n]+b[1]×x[n−1]+⋯+a[1]×y[n−1]+…
+- where x[n] is your input signal, and y[n] is your filtered output signal.
