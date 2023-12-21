@@ -4,6 +4,7 @@
 Cargo.lock
 target/
 filter_design/plot.png
+examples/hello.wav
 
 # editor files
 .vscode/*

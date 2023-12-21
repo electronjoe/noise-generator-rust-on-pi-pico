@@ -238,7 +238,20 @@ fn main() -> ! {
     let tx_buf2 = singleton!(: [u32; TABLE_SIZE] = message2).unwrap();
     let mut small_rng = SmallRng::seed_from_u64(0xfeedbeeffeedbeef_u64);
     let mut gen_num: usize = 0;
-    let mut butterworth = Butterworth::new();
+
+    // Filter coefficients
+    let b = [
+        I16F16::from_num(0.00414308),
+        I16F16::from_num(0),
+        I16F16::from_num(-0.00414308),
+    ];
+    let a = [
+        I16F16::from_num(1), // Unused, but as intended
+        I16F16::from_num(-1.99130017),
+        I16F16::from_num(0.99171384),
+    ];
+    let mut butterworth = Butterworth::new(a, b);
+
     generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, tx_buf1);
     gen_num += 1;
     generate_brown_noise(&mut small_rng, &mut butterworth, gen_num, tx_buf2);
